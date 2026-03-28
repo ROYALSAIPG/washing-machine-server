@@ -3,7 +3,8 @@ import requests
 
 app = Flask(__name__)
 
-ESP32_URL = "https://your-ngrok-url.ngrok.io"
+# Use a mock ESP32 URL for testing
+ESP32_URL = "http://127.0.0.1:5000/start"  # We’ll create this route next
 
 @app.route("/")
 def home():
@@ -24,9 +25,21 @@ def webhook():
             return "Invalid amount", 400
 
         try:
-            requests.get(f"{ESP32_URL}/start?duration={duration}")
-            return "Machine Started", 200
-        except:
+            # Call mock ESP32
+            requests.get(f"{ESP32_URL}?duration={duration}")
+            return f"Machine Started for {duration} seconds (Mock)", 200
+        except Exception as e:
+            print(e)
             return "ESP32 Error", 500
 
     return "OK", 200
+
+# Mock ESP32 endpoint
+@app.route("/start")
+def start_machine():
+    duration = request.args.get("duration")
+    print(f"[MOCK ESP32] Machine would run for {duration} seconds")
+    return f"Machine started for {duration} seconds (Mock)"
+    
+if __name__ == "__main__":
+    app.run(debug=True)
