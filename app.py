@@ -17,9 +17,9 @@ def webhook():
 
     if data and data.get("event") == "payment.captured":
         amount = data["payload"]["payment"]["entity"]["amount"]
-        if amount == 5000:
+        if amount == 1000:
             duration = 30
-        elif amount == 8000:
+        elif amount == 2000:
             duration = 60
         else:
             return "Invalid amount", 400
