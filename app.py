@@ -3,8 +3,9 @@ import requests
 
 app = Flask(__name__)
 
-# Use a mock ESP32 URL for testing
-ESP32_URL = "http://127.0.0.1:5000/start"  # We’ll create this route next
+# Instead of real ESP32, simulate by printing/logging
+def start_machine(duration):
+    print(f"[SIMULATED ESP32] Machine started for {duration} seconds")
 
 @app.route("/")
 def home():
@@ -14,9 +15,8 @@ def home():
 def webhook():
     data = request.json
 
-    if data.get("event") == "payment.captured":
+    if data and data.get("event") == "payment.captured":
         amount = data["payload"]["payment"]["entity"]["amount"]
-
         if amount == 5000:
             duration = 30
         elif amount == 8000:
@@ -24,22 +24,12 @@ def webhook():
         else:
             return "Invalid amount", 400
 
-        try:
-            # Call mock ESP32
-            requests.get(f"{ESP32_URL}?duration={duration}")
-            return f"Machine Started for {duration} seconds (Mock)", 200
-        except Exception as e:
-            print(e)
-            return "ESP32 Error", 500
+        # Simulate sending signal to ESP32 by calling function
+        start_machine(duration)
+
+        return "Machine Started (Simulated)", 200
 
     return "OK", 200
 
-# Mock ESP32 endpoint
-@app.route("/start")
-def start_machine():
-    duration = request.args.get("duration")
-    print(f"[MOCK ESP32] Machine would run for {duration} seconds")
-    return f"Machine started for {duration} seconds (Mock)"
-    
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
