@@ -1,86 +1,92 @@
 from flask import Flask, request, jsonify
+from collections import deque
 
 app = Flask(__name__)
 
-# Global variables
-machine_state = "OFF"
-duration = 0
+# Queue for commands
+command_queue = deque()
+
+# Current active command (sent to ESP32)
+active_command = {"command": "OFF", "duration": 0}
+
+# Flag: ESP32 finished last cycle
+cycle_ready = True
 
 
-# 🟢 Home route
+# ---------------- STATUS ----------------
+@app.route("/status")
+def status():
+    return jsonify({
+        "queue_size": len(command_queue),
+        "active_command": active_command,
+        "cycle_ready": cycle_ready
+    })
+
+
+# ---------------- RAZORPAY WEBHOOK ----------------
+@app.route("/razorpay-webhook", methods=["POST"])
+def razorpay_webhook():
+    global command_queue, cycle_ready
+
+    data = request.json
+    print("Webhook received:", data)
+
+    # Example: payment success
+    event = data.get("event")
+
+    if event == "payment.captured" or event == "order.paid":
+
+        # Example logic (you can change this)
+        amount = data["payload"]["payment"]["entity"]["amount"] / 100
+
+        # Decide duration
+        if amount >= 60:
+            duration = 60
+        else:
+            duration = 30
+
+        command_queue.append({
+            "command": "ON",
+            "duration": duration
+        })
+
+        print("Added to queue:", duration)
+
+    return jsonify({"status": "ok"}), 200
+
+
+# ---------------- ESP32 POLLING ----------------
+@app.route("/get-command")
+def get_command():
+    global active_command, command_queue, cycle_ready
+
+    # If queue has new command and ESP32 is ready
+    if cycle_ready and len(command_queue) > 0:
+
+        active_command = command_queue.popleft()
+        cycle_ready = False   # lock until cycle complete
+
+        print("Sent to ESP32:", active_command)
+
+    return jsonify(active_command)
+
+
+# ---------------- ESP32 COMPLETION SIGNAL ----------------
+@app.route("/cycle-complete", methods=["POST"])
+def cycle_complete():
+    global cycle_ready
+
+    cycle_ready = True
+    print("Cycle completed by ESP32")
+
+    return jsonify({"status": "ack"})
+
+
+# ---------------- TEST ----------------
 @app.route("/")
 def home():
     return "Server Running"
 
 
-# 🔥 Razorpay Webhook (IMPORTANT)
-@app.route("/razorpay-webhook", methods=["POST"])
-def webhook():
-    global machine_state, duration
-
-    data = request.json
-
-    print("🔥 WEBHOOK HIT")
-    print(data)
-
-    if data and data.get("event") == "payment.captured":
-
-        amount = data["payload"]["payment"]["entity"]["amount"]
-        print("💰 Amount:", amount)
-
-        # ₹50 = 5000 paise
-        if amount == 5000:
-            duration = 30   # 30 minutes
-        elif amount == 8000:
-            duration = 60   # 60 minutes
-        else:
-            print("❌ Invalid amount")
-            return "Invalid amount", 400
-
-        machine_state = "ON"
-        print("⚡ MACHINE SET TO ON")
-
-    return "OK", 200
-
-
-# 🔌 ESP32 will call this
-@app.route("/get-command")
-def get_command():
-    global machine_state, duration
-
-    response = {
-        "command": machine_state,
-        "duration": duration
-    }
-
-    print("📡 ESP32 Requested:", response)
-
-    # Reset after sending
-    machine_state = "OFF"
-    duration = 0
-
-    return jsonify(response)
-
-
-# 📱 Mobile status check
-@app.route("/status")
-def status():
-    return jsonify({
-        "status": machine_state,
-        "duration": duration
-    })
-
-
-# 🧪 Manual test (VERY IMPORTANT)
-@app.route("/test-on")
-def test_on():
-    global machine_state, duration
-    machine_state = "ON"
-    duration = 30
-    print("🧪 TEST MODE ON")
-    return "Machine ON (Test)"
-
-
-# 🚀 Run server
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run()
