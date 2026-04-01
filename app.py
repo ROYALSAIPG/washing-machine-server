@@ -44,9 +44,9 @@ def razorpay_webhook():
 
         # ---------------- EXACT MATCH LOGIC ----------------
         if amount == 100:        # ₹1
-            duration = 30
+            duration = 1
         elif amount == 200:     # ₹2
-            duration = 60
+            duration = 2
         else:
             print("Unknown amount:", amount)
             return jsonify({"status": "ignored amount"}), 200
