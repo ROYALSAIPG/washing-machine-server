@@ -37,24 +37,26 @@ def razorpay_webhook():
     if event in ["payment.captured", "order.paid"]:
 
         try:
-            amount = int(float(data["payload"]["payment"]["entity"]["amount"]) / 100)
+            # Razorpay amount is in PAISA
+            amount = int(data["payload"]["payment"]["entity"]["amount"])
         except:
             return jsonify({"status": "invalid payload"}), 400
 
         # ---------------- EXACT MATCH LOGIC ----------------
-        if amount == 1:
+        if amount == 100:        # ₹1
             duration = 30
-        elif amount == 2:
+        elif amount == 200:     # ₹2
             duration = 60
         else:
-            duration = 30  # fallback safety
+            print("Unknown amount:", amount)
+            return jsonify({"status": "ignored amount"}), 200
 
         command_queue.append({
             "command": "ON",
             "duration": duration
         })
 
-        print(f"Added to queue: ₹{amount} → {duration} min")
+        print(f"Added to queue: ₹{amount/100} → {duration} min")
 
     return jsonify({"status": "ok"}), 200
 
@@ -83,6 +85,6 @@ def cycle_complete():
     return jsonify({"status": "ack"}), 200
 
 
-# ---------------- RUN ----------------
+# ---------------- RUN SERVER ----------------
 if __name__ == "__main__":
     app.run()
