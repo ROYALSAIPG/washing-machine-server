@@ -17,7 +17,7 @@ machine_state = {
 }
 
 # ================= WHATSAPP =================
-def send_whatsapp(msg, phone="91XXXXXXXXXX"):
+def send_whatsapp(msg, phone="919226424495"):
     try:
         url = "https://api.callmebot.com/whatsapp.php"
         requests.get(url, params={
