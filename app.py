@@ -3,14 +3,15 @@ from collections import deque
 
 app = Flask(__name__)
 
-# Queue for commands
 command_queue = deque()
-
-# Current active command (sent to ESP32)
 active_command = {"command": "OFF", "duration": 0}
-
-# Flag: ESP32 finished last cycle
 cycle_ready = True
+
+
+# ---------------- HOME ----------------
+@app.route("/")
+def home():
+    return "Server Running"
 
 
 # ---------------- STATUS ----------------
@@ -26,52 +27,52 @@ def status():
 # ---------------- RAZORPAY WEBHOOK ----------------
 @app.route("/razorpay-webhook", methods=["POST"])
 def razorpay_webhook():
-    global command_queue, cycle_ready
+    global command_queue
 
     data = request.json
     print("Webhook received:", data)
 
-    # Example: payment success
     event = data.get("event")
 
-    if event == "payment.captured" or event == "order.paid":
+    if event in ["payment.captured", "order.paid"]:
 
-        # Example logic (you can change this)
-        amount = data["payload"]["payment"]["entity"]["amount"] / 100
+        try:
+            amount = int(float(data["payload"]["payment"]["entity"]["amount"]) / 100)
+        except:
+            return jsonify({"status": "invalid payload"}), 400
 
-        # Decide duration
-        if amount >= 60:
+        # ---------------- EXACT MATCH LOGIC ----------------
+        if amount == 1:
+            duration = 30
+        elif amount == 2:
             duration = 60
         else:
-            duration = 30
+            duration = 30  # fallback safety
 
         command_queue.append({
             "command": "ON",
             "duration": duration
         })
 
-        print("Added to queue:", duration)
+        print(f"Added to queue: ₹{amount} → {duration} min")
 
     return jsonify({"status": "ok"}), 200
 
 
-# ---------------- ESP32 POLLING ----------------
+# ---------------- ESP32 GET COMMAND ----------------
 @app.route("/get-command")
 def get_command():
-    global active_command, command_queue, cycle_ready
+    global active_command, cycle_ready
 
-    # If queue has new command and ESP32 is ready
     if cycle_ready and len(command_queue) > 0:
-
         active_command = command_queue.popleft()
-        cycle_ready = False   # lock until cycle complete
-
+        cycle_ready = False
         print("Sent to ESP32:", active_command)
 
     return jsonify(active_command)
 
 
-# ---------------- ESP32 COMPLETION SIGNAL ----------------
+# ---------------- ESP32 CYCLE COMPLETE ----------------
 @app.route("/cycle-complete", methods=["POST"])
 def cycle_complete():
     global cycle_ready
@@ -79,14 +80,9 @@ def cycle_complete():
     cycle_ready = True
     print("Cycle completed by ESP32")
 
-    return jsonify({"status": "ack"})
+    return jsonify({"status": "ack"}), 200
 
 
-# ---------------- TEST ----------------
-@app.route("/")
-def home():
-    return "Server Running"
-
-
+# ---------------- RUN ----------------
 if __name__ == "__main__":
     app.run()
