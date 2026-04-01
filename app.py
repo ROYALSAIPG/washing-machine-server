@@ -1,138 +1,112 @@
 from flask import Flask, request, jsonify
 from collections import deque
 import time
-import requests
 
 app = Flask(__name__)
 
-# ================= QUEUE =================
-queue = deque()
-active_job = None
+# ================= STATE =================
+command_queue = deque()
+active_command = {"command": "OFF", "duration": 0}
+cycle_ready = True
+
 processed_payments = set()
 
-# ================= MACHINE STATE =================
-machine = {
+machine_state = {
     "status": "IDLE",
-    "last_seen": time.time(),
-    "running": False
+    "last_seen": time.time()
 }
-
-# ================= WHATSAPP =================
-def whatsapp(msg, phone="919226424495"):
-    try:
-        requests.get(
-            "https://api.callmebot.com/whatsapp.php",
-            params={
-                "phone": phone,
-                "text": msg,
-                "apikey": "YOUR_API_KEY"
-            },
-            timeout=5
-        )
-    except:
-        print("WhatsApp failed")
 
 # ================= HOME =================
 @app.route("/")
 def home():
-    return "🚀 Smart Machine v2 Running"
+    return "Smart Machine Server Running"
 
-# ================= DASHBOARD =================
-@app.route("/dashboard")
-def dashboard():
+# ================= STATUS =================
+@app.route("/status")
+def status():
     return jsonify({
-        "queue_size": len(queue),
-        "active_job": active_job,
-        "machine": machine
+        "queue_size": len(command_queue),
+        "active_command": active_command,
+        "cycle_ready": cycle_ready,
+        "machine_state": machine_state
     })
 
 # ================= HEARTBEAT =================
 @app.route("/heartbeat", methods=["POST"])
 def heartbeat():
-    machine["last_seen"] = time.time()
-    machine["status"] = "ONLINE"
+    machine_state["last_seen"] = time.time()
+    machine_state["status"] = "ONLINE"
     return jsonify({"status": "ok"})
 
 # ================= RAZORPAY WEBHOOK =================
 @app.route("/razorpay-webhook", methods=["POST"])
-def webhook():
-    global queue
+def razorpay_webhook():
+    global command_queue
 
     data = request.json
-    print("WEBHOOK:", data)
+    print("Webhook received:", data)
 
     try:
         payment = data["payload"]["payment"]["entity"]
         payment_id = payment["id"]
-        amount = int(payment["amount"])
+        amount = int(payment["amount"])  # paisa
 
+        # prevent duplicate payment processing
         if payment_id in processed_payments:
-            return jsonify({"status": "duplicate"}), 200
+            return jsonify({"status": "duplicate ignored"}), 200
 
         processed_payments.add(payment_id)
 
     except:
-        return jsonify({"status": "invalid"}), 400
+        return jsonify({"status": "invalid payload"}), 400
 
     # ================= PRICE MAP =================
-    if amount == 100:
+    if amount == 100:        # ₹1
         duration = 1
-    elif amount == 200:
+    elif amount == 200:      # ₹2
         duration = 2
     else:
+        print("Unknown amount:", amount)
         return jsonify({"status": "ignored"}), 200
 
     job = {
-        "id": payment_id,
         "command": "ON",
-        "duration": duration,
-        "time": time.time()
+        "duration": duration
     }
 
-    queue.append(job)
+    command_queue.append(job)
 
-    print("QUEUE UPDATED:", list(queue))
-
-    whatsapp(f"💳 Payment received ₹{amount/100} - Job added")
+    print("QUEUE UPDATED:", list(command_queue))
 
     return jsonify({"status": "ok"}), 200
 
-# ================= GET COMMAND (ESP32) =================
+# ================= ESP32 GET COMMAND =================
 @app.route("/get-command")
 def get_command():
-    global active_job
+    global active_command, cycle_ready
 
-    # offline detection
-    if time.time() - machine["last_seen"] > 60:
-        machine["status"] = "OFFLINE"
+    machine_state["status"] = "READY"
 
-    if queue:
-        active_job = queue.popleft()
+    if cycle_ready and len(command_queue) > 0:
+        active_command = command_queue.popleft()
+        cycle_ready = False
 
-        machine["status"] = "RUNNING"
-        machine["running"] = True
+        machine_state["status"] = "DISPATCHED"
 
-        print("SENT TO ESP32:", active_job)
-
-        whatsapp(f"🚀 Machine STARTED for {active_job['duration']} min")
-
-        return jsonify(active_job)
+        print("SENT TO ESP32:", active_command)
+        return jsonify(active_command)
 
     return jsonify({"command": "OFF", "duration": 0})
 
 # ================= CYCLE COMPLETE =================
 @app.route("/cycle-complete", methods=["POST"])
-def complete():
-    global active_job
+def cycle_complete():
+    global cycle_ready
 
-    machine["status"] = "IDLE"
-    machine["running"] = False
+    cycle_ready = True
+    machine_state["status"] = "COOLDOWN"
 
-    print("CYCLE COMPLETE")
-
-    whatsapp("✅ Machine Cycle Completed")
-
-    active_job = None
+    print("Cycle completed by ESP32")
 
     return jsonify({"status": "ack"})
 
