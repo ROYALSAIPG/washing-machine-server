@@ -204,6 +204,11 @@ def cycle_complete():
     print("Cycle completed")
 
     return jsonify({"status": "ack"})
+# ================= TEST WHATSAPP (ADD THIS HERE) =================
+@app.route("/test-whatsapp")
+def test_whatsapp_route():
+    send_whatsapp("🔥 Test message from Flask server")
+    return "WhatsApp test triggered"
 
 # ================= RUN =================
 if __name__ == "__main__":
