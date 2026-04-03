@@ -2,14 +2,15 @@ from flask import Flask, request, jsonify, render_template
 from collections import deque
 import time
 import requests
+import os
 
 app = Flask(__name__)
 
 # ================= SETTINGS =================
 settings = {
     "prices": {
-        100: 1,
-        200: 2
+        100: 1,   # ₹1 → 1 min
+        200: 2    # ₹2 → 2 min
     }
 }
 
@@ -65,9 +66,22 @@ def get_settings():
 @app.route("/update-settings", methods=["POST"])
 def update_settings():
     global settings
+
     data = request.json
-    settings["prices"] = data.get("prices", settings["prices"])
-    return jsonify({"status": "updated"})
+    new_prices = data.get("prices", {})
+
+    fixed_prices = {}
+    for k, v in new_prices.items():
+        try:
+            fixed_prices[int(k)] = int(v)
+        except:
+            pass
+
+    settings["prices"] = fixed_prices
+
+    print("UPDATED SETTINGS:", settings)
+
+    return jsonify({"status": "updated", "settings": settings})
 
 # ================= HEARTBEAT =================
 @app.route("/heartbeat", methods=["POST"])
@@ -91,7 +105,7 @@ def manual_stop():
     send_whatsapp("⏹️ Manual Stop Triggered")
     return jsonify({"status": "stopped"})
 
-# ================= RAZORPAY =================
+# ================= RAZORPAY WEBHOOK =================
 @app.route("/razorpay-webhook", methods=["POST"])
 def razorpay_webhook():
     global command_queue
@@ -114,11 +128,14 @@ def razorpay_webhook():
     duration = settings["prices"].get(amount)
 
     if not duration:
+        print("Unknown amount:", amount)
         return jsonify({"status": "ignored"})
 
     command_queue.append({"command": "ON", "duration": duration})
 
     send_whatsapp(f"✅ Payment Received ₹{amount/100}")
+
+    print("QUEUE:", list(command_queue))
 
     return jsonify({"status": "ok"})
 
@@ -127,14 +144,18 @@ def razorpay_webhook():
 def get_command():
     global active_command, cycle_ready, command_start_time
 
+    # Timeout safety
     if not cycle_ready:
         if time.time() - command_start_time > TIMEOUT:
+            print("Timeout reset")
             cycle_ready = True
 
     if cycle_ready and len(command_queue) > 0:
         active_command = command_queue.popleft()
         cycle_ready = False
         command_start_time = time.time()
+
+        machine_state["status"] = "RUNNING"
 
         send_whatsapp(f"▶️ Machine Started for {active_command['duration']} min")
 
@@ -150,10 +171,15 @@ def cycle_complete():
     cycle_ready = True
     active_command = {"command": "OFF", "duration": 0}
 
+    machine_state["status"] = "COMPLETED"
+
     send_whatsapp("⏹️ Cycle Completed")
+
+    print("Cycle completed")
 
     return jsonify({"status": "ack"})
 
 # ================= RUN =================
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    port = int(os.environ.get("PORT", 10000))  # Render compatible
+    app.run(host="0.0.0.0", port=port)
