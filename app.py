@@ -8,8 +8,8 @@ app = Flask(__name__)
 # ================= SETTINGS =================
 settings = {
     "prices": {
-        100: 1,   # ₹1 → 1 min
-        200: 2    # ₹2 → 2 min
+        100: 1,
+        200: 2
     }
 }
 
@@ -26,7 +26,7 @@ machine_state = {
     "last_seen": time.time()
 }
 
-TIMEOUT = 120  # seconds
+TIMEOUT = 120
 
 # ================= WHATSAPP =================
 def send_whatsapp(msg):
@@ -41,7 +41,7 @@ def send_whatsapp(msg):
 def home():
     return "Smart Machine Server Running"
 
-# ================= ADMIN PANEL =================
+# ================= ADMIN =================
 @app.route("/admin")
 def admin():
     return render_template("admin.html")
@@ -67,7 +67,7 @@ def update_settings():
     global settings
     data = request.json
     settings["prices"] = data.get("prices", settings["prices"])
-    return jsonify({"status": "updated", "settings": settings})
+    return jsonify({"status": "updated"})
 
 # ================= HEARTBEAT =================
 @app.route("/heartbeat", methods=["POST"])
@@ -91,13 +91,12 @@ def manual_stop():
     send_whatsapp("⏹️ Manual Stop Triggered")
     return jsonify({"status": "stopped"})
 
-# ================= RAZORPAY WEBHOOK =================
+# ================= RAZORPAY =================
 @app.route("/razorpay-webhook", methods=["POST"])
 def razorpay_webhook():
     global command_queue
 
     data = request.json
-    print("Webhook received:", data)
 
     try:
         payment = data["payload"]["payment"]["entity"]
@@ -105,34 +104,29 @@ def razorpay_webhook():
         amount = int(payment["amount"])
 
         if payment_id in processed_payments:
-            return jsonify({"status": "duplicate"}), 200
+            return jsonify({"status": "duplicate"})
 
         processed_payments.add(payment_id)
 
     except:
         return jsonify({"status": "invalid"}), 400
 
-    # Dynamic pricing
     duration = settings["prices"].get(amount)
 
     if not duration:
-        return jsonify({"status": "ignored"}), 200
+        return jsonify({"status": "ignored"})
 
-    job = {"command": "ON", "duration": duration}
-    command_queue.append(job)
+    command_queue.append({"command": "ON", "duration": duration})
 
     send_whatsapp(f"✅ Payment Received ₹{amount/100}")
 
-    return jsonify({"status": "ok"}), 200
+    return jsonify({"status": "ok"})
 
 # ================= GET COMMAND =================
 @app.route("/get-command")
 def get_command():
     global active_command, cycle_ready, command_start_time
 
-    machine_state["status"] = "READY"
-
-    # Timeout safety
     if not cycle_ready:
         if time.time() - command_start_time > TIMEOUT:
             cycle_ready = True
@@ -142,23 +136,19 @@ def get_command():
         cycle_ready = False
         command_start_time = time.time()
 
-        machine_state["status"] = "RUNNING"
-
         send_whatsapp(f"▶️ Machine Started for {active_command['duration']} min")
 
         return jsonify(active_command)
 
     return jsonify({"command": "OFF", "duration": 0})
 
-# ================= CYCLE COMPLETE =================
+# ================= COMPLETE =================
 @app.route("/cycle-complete", methods=["POST"])
 def cycle_complete():
     global cycle_ready, active_command
 
     cycle_ready = True
     active_command = {"command": "OFF", "duration": 0}
-
-    machine_state["status"] = "COMPLETED"
 
     send_whatsapp("⏹️ Cycle Completed")
 
