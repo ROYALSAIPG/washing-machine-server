@@ -40,7 +40,7 @@ def send_whatsapp(msg):
 
     data = {
         "messaging_product": "whatsapp",
-        "to": TO_NUMBER,
+        "to": +919226424495,
         "type": "text",
         "text": {"body": msg}
     }
