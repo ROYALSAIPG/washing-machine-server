@@ -4,9 +4,9 @@
     <title>Machine Admin Panel</title>
     <style>
         body { font-family: Arial; padding: 20px; }
-        .box { border: 1px solid #ccc; padding: 15px; width: 320px; margin-bottom: 20px; }
-        input { padding: 5px; margin: 5px 0; width: 100%; }
-        button { padding: 10px; margin-top: 10px; width: 100%; }
+        .box { border: 1px solid #ccc; padding: 15px; width: 400px; margin-bottom: 20px; }
+        input { padding: 5px; margin: 5px; }
+        button { padding: 10px; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -14,20 +14,16 @@
 <h2>⚙️ Machine Admin Panel</h2>
 
 <div class="box">
-    <h3>💰 Update Pricing</h3>
+    <h3>💰 Pricing Settings</h3>
 
-    <label>₹1 (100 paisa):</label>
-    <input type="number" id="p100">
+    <div id="priceList"></div>
 
-    <label>₹2 (200 paisa):</label>
-    <input type="number" id="p200">
-
-    <button onclick="updateSettings()">Update</button>
+    <button onclick="addRow()">➕ Add New</button><br><br>
+    <button onclick="saveSettings()">💾 Save</button>
 </div>
 
 <div class="box">
     <h3>🎮 Manual Control</h3>
-
     <button onclick="startMachine()">▶️ Start</button>
     <button onclick="stopMachine()">⏹️ Stop</button>
 </div>
@@ -38,32 +34,54 @@
 </div>
 
 <script>
+
+function addRow(amount="", duration="") {
+    let div = document.createElement("div");
+
+    div.innerHTML = `
+        ₹ <input type="number" class="amount" value="${amount}" placeholder="Amount (₹)">
+        → <input type="number" class="duration" value="${duration}" placeholder="Minutes">
+        <button onclick="this.parentElement.remove()">❌</button>
+    `;
+
+    document.getElementById("priceList").appendChild(div);
+}
+
 function loadSettings() {
     fetch("/get-settings")
     .then(res => res.json())
     .then(data => {
-        document.getElementById("p100").value = data.prices[100];
-        document.getElementById("p200").value = data.prices[200];
+        document.getElementById("priceList").innerHTML = "";
+
+        for (let amt in data.prices) {
+            addRow(amt/100, data.prices[amt]); // paisa → ₹
+        }
     });
 }
 
-function updateSettings() {
-    let p100 = document.getElementById("p100").value;
-    let p200 = document.getElementById("p200").value;
+function saveSettings() {
+    let amounts = document.getElementsByClassName("amount");
+    let durations = document.getElementsByClassName("duration");
+
+    let prices = {};
+
+    for (let i = 0; i < amounts.length; i++) {
+        let amt = parseInt(amounts[i].value) * 100; // ₹ → paisa
+        let dur = parseInt(durations[i].value);
+
+        if (amt && dur) {
+            prices[amt] = dur;
+        }
+    }
 
     fetch("/update-settings", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-            prices: {
-                100: parseInt(p100),
-                200: parseInt(p200)
-            }
-        })
+        body: JSON.stringify({prices: prices})
     })
     .then(res => res.json())
     .then(() => {
-        alert("✅ Updated");
+        alert("✅ Saved Successfully");
         loadSettings();
     });
 }
@@ -78,18 +96,17 @@ function loadStatus() {
 }
 
 function startMachine() {
-    fetch("/manual-start", {method: "POST"})
-    .then(() => alert("▶️ Started"));
+    fetch("/manual-start", {method: "POST"});
 }
 
 function stopMachine() {
-    fetch("/manual-stop", {method: "POST"})
-    .then(() => alert("⏹️ Stopped"));
+    fetch("/manual-stop", {method: "POST"});
 }
 
 setInterval(loadStatus, 3000);
 loadSettings();
 loadStatus();
+
 </script>
 
 </body>
