@@ -1,12 +1,16 @@
-import sqlite3
 @app.route("/razorpay-webhook", methods=["POST"])
 def razorpay_webhook():
+    global command_queue
+
     print("🔥 WEBHOOK HIT")
 
+    # SAFE PARSING (IMPORTANT FIX)
     data = request.get_json(silent=True)
 
     if not data:
-        return jsonify({"status": "bad_request"}), 400
+        data = request.form.to_dict()
+
+    print("PAYLOAD:", data)
 
     try:
         payment = data["payload"]["payment"]["entity"]
@@ -14,37 +18,29 @@ def razorpay_webhook():
         payment_id = payment.get("id")
         amount = int(payment.get("amount", 0))
 
+        print("PAYMENT ID:", payment_id)
+        print("AMOUNT:", amount)
+
+        if payment_id in processed_payments:
+            return jsonify({"status": "duplicate"})
+
+        processed_payments.add(payment_id)
+
     except Exception as e:
-        print("❌ PARSE ERROR:", e)
+        print("WEBHOOK ERROR:", e)
         return jsonify({"status": "invalid"}), 400
 
-    # ================= DUPLICATE CHECK =================
-    if db_payment_exists(payment_id):
-        return jsonify({"status": "duplicate"})
-
-    save_payment(payment_id, amount)
-
-    # ================= AMOUNT MAP =================
     duration = settings["prices"].get(amount)
 
     if not duration:
+        print("Unknown amount:", amount)
         return jsonify({"status": "ignored"})
 
-    # ================= CREATE COMMAND =================
-    command_id = create_command(
-        payment_id=payment_id,
-        command="ON",
-        duration=duration
-    )
+    command_queue.append({"command": "ON", "duration": duration})
 
-    # 🔥 IMPORTANT: mark as SENT immediately (prevents duplicate fetching confusion)
-    update_command_status(command_id, "SENT")
+    # 🔥 WhatsApp message (FIXED FLOW)
+    send_whatsapp(f"✅ Payment Received ₹{amount/100}")
 
-    print("✅ COMMAND CREATED:", command_id)
+    print("QUEUE:", list(command_queue))
 
-    return jsonify({
-        "status": "ok",
-        "command_id": command_id,
-        "command": "ON",
-        "duration": duration
-    })
+    return jsonify({"status": "ok"})
