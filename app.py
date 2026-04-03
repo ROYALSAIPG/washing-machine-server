@@ -30,17 +30,11 @@ machine_state = {
 TIMEOUT = 120
 
 # ================= WHATSAPP =================
-import requests
-
-ACCESS_TOKEN = "EAAlR6bDuHQQBRCixbyMFXrGXBh5tx9MALiBaQ1O8BLZA7FHtU1yGYL0un6PYO1NeJZBtpSqGZCV1ezIpxa1nJcpo8DRBhXE00CXGzWeEElN4WrMuG43IvFjRF9wBqI82bUFbTAPtZCIZAeAqBZCJEw09BpiXwalaIUOo04p4ffApsFtboDtHWDmVIJkk8imnqBQAZDZD"
-PHONE_NUMBER_ID = "1026438257222002"
-TO_NUMBER = "919226424495"  # your number
-
 def send_whatsapp(msg):
-    url = f"https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/messages"
+    url = f"https://graph.facebook.com/v18.0/{1026438257222002}/messages"
 
     headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Authorization": f"Bearer {EAAlR6bDuHQQBRCixbyMFXrGXBh5tx9MALiBaQ1O8BLZA7FHtU1yGYL0un6PYO1NeJZBtpSqGZCV1ezIpxa1nJcpo8DRBhXE00CXGzWeEElN4WrMuG43IvFjRF9wBqI82bUFbTAPtZCIZAeAqBZCJEw09BpiXwalaIUOo04p4ffApsFtboDtHWDmVIJkk8imnqBQAZDZD}",
         "Content-Type": "application/json"
     }
 
@@ -48,14 +42,15 @@ def send_whatsapp(msg):
         "messaging_product": "whatsapp",
         "to": TO_NUMBER,
         "type": "text",
-        "text": {
-            "body": msg
-        }
+        "text": {"body": msg}
     }
 
     try:
         response = requests.post(url, headers=headers, json=data)
-        print("WhatsApp response:", response.text)
+
+        print("Status Code:", response.status_code)
+        print("Response:", response.text)
+
     except Exception as e:
         print("WhatsApp error:", e)
 
