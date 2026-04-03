@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Machine Admin Panel</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        input { padding: 5px; margin: 5px; }
+        button { padding: 10px; margin-top: 10px; }
+        .box { border: 1px solid #ccc; padding: 15px; width: 300px; }
+    </style>
+</head>
+<body>
+
+<h2>⚙️ Machine Admin Panel</h2>
+
+<div class="box">
+    <h3>Update Price & Duration</h3>
+
+    <label>₹1 (100 paisa):</label><br>
+    <input type="number" id="p100"><br>
+
+    <label>₹2 (200 paisa):</label><br>
+    <input type="number" id="p200"><br>
+
+    <button onclick="updateSettings()">Update</button>
+</div>
+
+<br>
+
+<div class="box">
+    <h3>📊 Machine Status</h3>
+    <pre id="statusBox">Loading...</pre>
+</div>
+
+<script>
+function loadStatus() {
+    fetch("/status")
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById("statusBox").innerText =
+            JSON.stringify(data, null, 2);
+    });
+}
+
+function updateSettings() {
+    let p100 = document.getElementById("p100").value;
+    let p200 = document.getElementById("p200").value;
+
+    fetch("/update-settings", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            prices: {
+                100: parseInt(p100),
+                200: parseInt(p200)
+            }
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert("✅ Updated Successfully");
+        loadStatus();
+    });
+}
+
+// auto refresh status every 3 sec
+setInterval(loadStatus, 3000);
+loadStatus();
+</script>
+
+</body>
+</html>
