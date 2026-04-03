@@ -30,10 +30,32 @@ machine_state = {
 TIMEOUT = 120
 
 # ================= WHATSAPP =================
+import requests
+
+ACCESS_TOKEN = "EAAlR6bDuHQQBRARYb7QRrj3T513gYZBDtZAm2qO7cpC1d9wBdgrupRMfLMCDwxATsukarb3gwm4INRvnU9sLfIRcA6stRTbW98HvPRAeZCMLfdJFBczpaOUrNUBZAdycPY1nE7xi13hgZBMASTkad657JfyRANoM5LI4fzTbCbfYj1xag8eqFQkeuPMbVTSyRbjJMflLsn9B1R0BhKnx6m6bfZAwxCKFdHeiIbpAJWdGOz4BAM3xn7ScGNZCEz4bkHChyZA7QdTzKOwgEpPhgWVzFGcxYAZDZD"
+PHONE_NUMBER_ID = "1026438257222002"
+TO_NUMBER = "919226424495"  # your number
+
 def send_whatsapp(msg):
+    url = f"https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/messages"
+
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "messaging_product": "whatsapp",
+        "to": TO_NUMBER,
+        "type": "text",
+        "text": {
+            "body": msg
+        }
+    }
+
     try:
-        url = f"https://api.callmebot.com/whatsapp.php?phone=919226424495&text={msg}&apikey=YOUR_API_KEY"
-        requests.get(url)
+        response = requests.post(url, headers=headers, json=data)
+        print("WhatsApp response:", response.text)
     except Exception as e:
         print("WhatsApp error:", e)
 
