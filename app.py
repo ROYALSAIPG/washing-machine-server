@@ -36,9 +36,11 @@ def razorpay_webhook():
         duration=duration
     )
 
+    # 🔥 IMPORTANT: mark as SENT immediately (prevents duplicate fetching confusion)
+    update_command_status(command_id, "SENT")
+
     print("✅ COMMAND CREATED:", command_id)
 
-    # ================= RETURN FAST =================
     return jsonify({
         "status": "ok",
         "command_id": command_id,
