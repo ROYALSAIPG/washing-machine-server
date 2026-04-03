@@ -4,9 +4,9 @@
     <title>Machine Admin Panel</title>
     <style>
         body { font-family: Arial; padding: 20px; }
-        input { padding: 5px; margin: 5px; }
-        button { padding: 10px; margin-top: 10px; }
-        .box { border: 1px solid #ccc; padding: 15px; width: 300px; }
+        .box { border: 1px solid #ccc; padding: 15px; width: 320px; margin-bottom: 20px; }
+        input { padding: 5px; margin: 5px 0; width: 100%; }
+        button { padding: 10px; margin-top: 10px; width: 100%; }
     </style>
 </head>
 <body>
@@ -14,18 +14,23 @@
 <h2>⚙️ Machine Admin Panel</h2>
 
 <div class="box">
-    <h3>Update Price & Duration</h3>
+    <h3>💰 Update Pricing</h3>
 
-    <label>₹1 (100 paisa):</label><br>
-    <input type="number" id="p100"><br>
+    <label>₹1 (100 paisa):</label>
+    <input type="number" id="p100">
 
-    <label>₹2 (200 paisa):</label><br>
-    <input type="number" id="p200"><br>
+    <label>₹2 (200 paisa):</label>
+    <input type="number" id="p200">
 
     <button onclick="updateSettings()">Update</button>
 </div>
 
-<br>
+<div class="box">
+    <h3>🎮 Manual Control</h3>
+
+    <button onclick="startMachine()">▶️ Start</button>
+    <button onclick="stopMachine()">⏹️ Stop</button>
+</div>
 
 <div class="box">
     <h3>📊 Machine Status</h3>
@@ -33,12 +38,12 @@
 </div>
 
 <script>
-function loadStatus() {
-    fetch("/status")
+function loadSettings() {
+    fetch("/get-settings")
     .then(res => res.json())
     .then(data => {
-        document.getElementById("statusBox").innerText =
-            JSON.stringify(data, null, 2);
+        document.getElementById("p100").value = data.prices[100];
+        document.getElementById("p200").value = data.prices[200];
     });
 }
 
@@ -57,14 +62,33 @@ function updateSettings() {
         })
     })
     .then(res => res.json())
-    .then(data => {
-        alert("✅ Updated Successfully");
-        loadStatus();
+    .then(() => {
+        alert("✅ Updated");
+        loadSettings();
     });
 }
 
-// auto refresh status every 3 sec
+function loadStatus() {
+    fetch("/status")
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById("statusBox").innerText =
+            JSON.stringify(data, null, 2);
+    });
+}
+
+function startMachine() {
+    fetch("/manual-start", {method: "POST"})
+    .then(() => alert("▶️ Started"));
+}
+
+function stopMachine() {
+    fetch("/manual-stop", {method: "POST"})
+    .then(() => alert("⏹️ Stopped"));
+}
+
 setInterval(loadStatus, 3000);
+loadSettings();
 loadStatus();
 </script>
 
