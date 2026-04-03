@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from collections import deque
 import time
 import requests
@@ -41,6 +41,11 @@ def send_whatsapp(msg):
 def home():
     return "Smart Machine Server Running"
 
+# ================= ADMIN PANEL =================
+@app.route("/admin")
+def admin():
+    return render_template("admin.html")
+
 # ================= STATUS =================
 @app.route("/status")
 def status():
@@ -51,6 +56,19 @@ def status():
         "machine_state": machine_state
     })
 
+# ================= GET SETTINGS =================
+@app.route("/get-settings")
+def get_settings():
+    return jsonify(settings)
+
+# ================= UPDATE SETTINGS =================
+@app.route("/update-settings", methods=["POST"])
+def update_settings():
+    global settings
+    data = request.json
+    settings["prices"] = data.get("prices", settings["prices"])
+    return jsonify({"status": "updated", "settings": settings})
+
 # ================= HEARTBEAT =================
 @app.route("/heartbeat", methods=["POST"])
 def heartbeat():
@@ -58,15 +76,20 @@ def heartbeat():
     machine_state["status"] = "ONLINE"
     return jsonify({"status": "ok"})
 
-# ================= UPDATE SETTINGS =================
-@app.route("/update-settings", methods=["POST"])
-def update_settings():
-    global settings
+# ================= MANUAL START =================
+@app.route("/manual-start", methods=["POST"])
+def manual_start():
+    command_queue.append({"command": "ON", "duration": 1})
+    send_whatsapp("▶️ Manual Start Triggered")
+    return jsonify({"status": "started"})
 
-    data = request.json
-    settings["prices"] = data.get("prices", settings["prices"])
-
-    return jsonify({"status": "updated", "settings": settings})
+# ================= MANUAL STOP =================
+@app.route("/manual-stop", methods=["POST"])
+def manual_stop():
+    global cycle_ready
+    cycle_ready = True
+    send_whatsapp("⏹️ Manual Stop Triggered")
+    return jsonify({"status": "stopped"})
 
 # ================= RAZORPAY WEBHOOK =================
 @app.route("/razorpay-webhook", methods=["POST"])
@@ -89,20 +112,16 @@ def razorpay_webhook():
     except:
         return jsonify({"status": "invalid"}), 400
 
-    # ✅ USE SETTINGS (dynamic)
+    # Dynamic pricing
     duration = settings["prices"].get(amount)
 
     if not duration:
-        print("Unknown amount:", amount)
         return jsonify({"status": "ignored"}), 200
 
     job = {"command": "ON", "duration": duration}
     command_queue.append(job)
 
-    # ✅ WhatsApp
     send_whatsapp(f"✅ Payment Received ₹{amount/100}")
-
-    print("QUEUE:", list(command_queue))
 
     return jsonify({"status": "ok"}), 200
 
@@ -113,10 +132,9 @@ def get_command():
 
     machine_state["status"] = "READY"
 
-    # ✅ timeout safety
+    # Timeout safety
     if not cycle_ready:
         if time.time() - command_start_time > TIMEOUT:
-            print("Timeout reset")
             cycle_ready = True
 
     if cycle_ready and len(command_queue) > 0:
@@ -126,7 +144,6 @@ def get_command():
 
         machine_state["status"] = "RUNNING"
 
-        # ✅ WhatsApp
         send_whatsapp(f"▶️ Machine Started for {active_command['duration']} min")
 
         return jsonify(active_command)
@@ -143,13 +160,10 @@ def cycle_complete():
 
     machine_state["status"] = "COMPLETED"
 
-    # ✅ WhatsApp
     send_whatsapp("⏹️ Cycle Completed")
-
-    print("Cycle completed")
 
     return jsonify({"status": "ack"})
 
 # ================= RUN =================
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=10000)
