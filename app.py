@@ -93,9 +93,14 @@ def heartbeat():
 # ================= MANUAL START =================
 @app.route("/manual-start", methods=["POST"])
 def manual_start():
-    command_queue.append({"command": "ON", "duration": 1})
-    send_whatsapp("▶️ Manual Start Triggered")
-    return jsonify({"status": "started"})
+    data = request.json
+    duration = int(data.get("duration", 1))  # default 1 min
+
+    command_queue.append({"command": "ON", "duration": duration})
+
+    send_whatsapp(f"▶️ Manual Start for {duration} min")
+
+    return jsonify({"status": "started", "duration": duration})
 
 # ================= MANUAL STOP =================
 @app.route("/manual-stop", methods=["POST"])
