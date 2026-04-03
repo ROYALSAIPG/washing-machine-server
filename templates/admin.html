@@ -6,7 +6,7 @@
         body { font-family: Arial; padding: 20px; }
         .box { border: 1px solid #ccc; padding: 15px; width: 400px; margin-bottom: 20px; }
         input { padding: 5px; margin: 5px; }
-        button { padding: 10px; margin-top: 10px; }
+        button { padding: 10px; margin: 5px; }
     </style>
 </head>
 <body>
@@ -24,8 +24,21 @@
 
 <div class="box">
     <h3>🎮 Manual Control</h3>
+
+    <label>Duration (minutes):</label>
+    <input type="number" id="manualDuration" value="1">
+
+    <br>
+
     <button onclick="startMachine()">▶️ Start</button>
     <button onclick="stopMachine()">⏹️ Stop</button>
+
+    <hr>
+
+    <b>Quick Start:</b><br>
+    <button onclick="quickStart(1)">1 min</button>
+    <button onclick="quickStart(5)">5 min</button>
+    <button onclick="quickStart(10)">10 min</button>
 </div>
 
 <div class="box">
@@ -54,7 +67,7 @@ function loadSettings() {
         document.getElementById("priceList").innerHTML = "";
 
         for (let amt in data.prices) {
-            addRow(amt/100, data.prices[amt]); // paisa → ₹
+            addRow(amt/100, data.prices[amt]);
         }
     });
 }
@@ -66,7 +79,7 @@ function saveSettings() {
     let prices = {};
 
     for (let i = 0; i < amounts.length; i++) {
-        let amt = parseInt(amounts[i].value) * 100; // ₹ → paisa
+        let amt = parseInt(amounts[i].value) * 100;
         let dur = parseInt(durations[i].value);
 
         if (amt && dur) {
@@ -95,12 +108,28 @@ function loadStatus() {
     });
 }
 
+// ✅ UPDATED START (WITH DURATION)
 function startMachine() {
-    fetch("/manual-start", {method: "POST"});
+    let duration = document.getElementById("manualDuration").value;
+
+    fetch("/manual-start", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({duration: parseInt(duration)})
+    })
+    .then(() => alert("▶️ Started for " + duration + " min"));
 }
 
+// ✅ QUICK BUTTONS
+function quickStart(min) {
+    document.getElementById("manualDuration").value = min;
+    startMachine();
+}
+
+// STOP
 function stopMachine() {
-    fetch("/manual-stop", {method: "POST"});
+    fetch("/manual-stop", {method: "POST"})
+    .then(() => alert("⏹️ Stopped"));
 }
 
 setInterval(loadStatus, 3000);
